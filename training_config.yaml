@@ -1,1 +1,46 @@
 
+# Model configuration
+model:
+  input_shape: [240, 240, 3]  # [height, width, channels]
+  num_classes: 15  # Including background
+  mobilenet_alpha: 0.35  # Width multiplier for MobileNetV2 (smaller = faster)
+  anchor_boxes_per_cell: 3  # Number of anchor boxes per grid cell
+
+# Training parameters
+training:
+  batch_size: 16
+  learning_rate: 0.001
+  epochs: 100
+  steps_per_epoch: 500
+  validation_steps: 50
+  early_stopping_patience: 10
+  freeze_backbone: true  # Freeze backbone layers for transfer learning
+  
+  # Loss weights
+  box_loss_weight: 1.0
+  class_loss_weight: 1.0
+  conf_loss_weight: 1.0
+
+# Data settings
+data:
+  train_data: "data/train"
+  val_data: "data/val"
+  test_data: "data/test"
+  annotation_format: "coco"  # Options: "coco", "voc", "custom"
+  
+  # Data augmentation
+  augmentation:
+    random_flip: true
+    random_rotation: 15  # Max rotation angle in degrees
+    random_brightness: 0.2
+    random_contrast: 0.2
+    random_saturation: 0.2
+    random_hue: 0.1
+    random_crop: true
+    random_zoom: 0.1
+
+# Paths
+paths:
+  data_dir: "data/"
+  output_dir: "outputs/"
+  pretrained_weights: null  # Path to pretrained weights or null
