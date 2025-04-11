@@ -1,1 +1,127 @@
+#!/bin/bash
 
+set -e
+
+echo "==== Edge AI Object Detection System - Raspberry Pi Setup ===="
+echo "This script will set up your Raspberry Pi for running the Edge AI Object Detection system."
+echo ""
+
+# Check if running on Raspberry Pi
+if [ ! -f /proc/device-tree/model ]; then
+    echo "ERROR: This script is intended to run on Raspberry Pi."
+    exit 1
+fi
+
+PI_MODEL=$(tr -d '\0' < /proc/device-tree/model)
+echo "Detected: $PI_MODEL"
+
+# Create and activate virtual environment
+echo "Setting up Python virtual environment..."
+if [ -d "venv" ]; then
+    echo "Virtual environment already exists."
+else
+    python3 -m venv venv
+    echo "Virtual environment created."
+fi
+
+echo "Activating virtual environment..."
+source venv/bin/activate
+
+# Install dependencies
+echo "Installing dependencies..."
+# First install system dependencies
+sudo apt-get update
+sudo apt-get install -y \
+    libatlas-base-dev \
+    libhdf5-dev \
+    libc-ares-dev \
+    libeigen3-dev \
+    libopenblas-dev \
+    python3-dev \
+    python3-pip \
+    python3-numpy \
+    python3-opencv \
+    cmake \
+    gfortran
+
+# Install TensorFlow Lite Runtime
+echo "Installing TensorFlow Lite Runtime..."
+pip install https://github.com/google-coral/pycoral/releases/download/v2.0.0/tflite_runtime-2.5.0-cp37-cp37m-linux_armv7l.whl
+
+# Install Python dependencies
+echo "Installing Python packages..."
+pip install -r requirements.txt
+
+# Enable camera if it's a Raspberry Pi
+if [[ $PI_MODEL == *"Raspberry Pi"* ]]; then
+    echo "Configuring Raspberry Pi camera..."
+    if ! grep -q "start_x=1" /boot/config.txt; then
+        echo "Enabling camera in /boot/config.txt..."
+        sudo bash -c 'echo "start_x=1" >> /boot/config.txt'
+        sudo bash -c 'echo "gpu_mem=128" >> /boot/config.txt'
+        echo "Camera enabled. A reboot will be required."
+    else
+        echo "Camera already enabled in /boot/config.txt."
+    fi
+fi
+
+# Create directories if they don't exist
+echo "Creating project directories..."
+mkdir -p data/{train,val,test}
+mkdir -p models
+mkdir -p logs
+mkdir -p outputs
+
+# Download the pre-trained model if it doesn't exist
+if [ ! -f "models/quantized_model.tflite" ]; then
+    echo "Downloading pre-trained model..."
+    wget -O models/quantized_model.tflite https://github.com/yourusername/edge-ai-object-detection/releases/download/v1.0/quantized_model.tflite
+    echo "Pre-trained model downloaded."
+else
+    echo "Pre-trained model already exists."
+fi
+
+# Create a helper script to run the detection
+echo "Creating run script..."
+cat > run_detection.sh << 'EOF'
+#!/bin/bash
+source venv/bin/activate
+python src/detect.py --model models/quantized_model.tflite --camera 0
+EOF
+chmod +x run_detection.sh
+
+# Set up systemd service for running at boot (optional)
+echo "Do you want to set up the detection system to run at boot? (y/n)"
+read AUTO_START
+if [[ $AUTO_START == "y" || $AUTO_START == "Y" ]]; then
+    echo "Setting up autostart service..."
+    SERVICE_FILE="/etc/systemd/system/edge-detection.service"
+    
+    # Create service file
+    sudo bash -c "cat > $SERVICE_FILE" << EOF
+[Unit]
+Description=Edge AI Object Detection Service
+After=network.target
+
+[Service]
+User=$USER
+WorkingDirectory=$PWD
+ExecStart=$PWD/run_detection.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Enable and start the service
+    sudo systemctl enable edge-detection.service
+    echo "Service created and enabled. It will start on next boot."
+    echo "To start it now, run: sudo systemctl start edge-detection.service"
+else
+    echo "Skipping autostart setup."
+fi
+
+echo ""
+echo "==== Setup Complete ===="
+echo "To run the detection system, use: ./run_detection.sh"
+echo ""
