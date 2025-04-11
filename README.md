@@ -126,12 +126,12 @@ If you use this project in your research or application, please cite:
 
 ```
 @misc{edge-ai-object-detection,
-  author = {Your Name},
+  author = {Anouska Abhisikta},
   title = {Edge AI Object Detection System},
-  year = {2023},
+  year = {2025},
   publisher = {GitHub},
   journal = {GitHub repository},
-  howpublished = {\url{https://github.com/yourusername/edge-ai-object-detection}}
+  howpublished = {\url{https://github.com/Anouska-Abhisikta/edge-ai-object-detection}}
 }
 ```
 
